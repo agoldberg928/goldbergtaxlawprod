@@ -7,7 +7,7 @@
     "predeploytest": "env-cmd -f .env.test npm run build",
     "predeployprod": "env-cmd -f .env.prod npm run build",
     "deploytest": "gh-pages -d build",
-    "deployprod": "gh-pages -d build",
+    "deployprod": "gh-pages -d build --remote prod",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "build:test": "env-cmd -f .env.test npm run build",
