@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/goldbergtaxlawprod/static/css/main.338d075f.css",
+    "main.js": "/goldbergtaxlawprod/static/js/main.7223d2ee.js",
+    "index.html": "/goldbergtaxlawprod/index.html",
+    "main.338d075f.css.map": "/goldbergtaxlawprod/static/css/main.338d075f.css.map",
+    "main.7223d2ee.js.map": "/goldbergtaxlawprod/static/js/main.7223d2ee.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.338d075f.css",
+    "static/js/main.7223d2ee.js"
+  ]
+}
