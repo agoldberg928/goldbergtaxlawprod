@@ -1,7 +1,7 @@
 {
   "name": "analyze-bank-documents.dev",
   "version": "1.0.0",
-  "homepage": "https://agoldberg928.github.io/goldbergtaxlawtest",
+  "homepage": "https://agoldberg928.github.io/goldbergtaxlawprod",
   "main": "/src/index.js",
   "scripts": {
     "predeploy": "npm run build",
