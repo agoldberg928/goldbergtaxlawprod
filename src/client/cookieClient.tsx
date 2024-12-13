@@ -37,7 +37,10 @@ export function deleteCookie(cname: CookieKey) {
 export enum CookieKey {
     INPUT_SAS_TOKEN = "inputSas",
     OUTPUT_SAS_TOKEN = "outputSas",
-    GOOGLE_SESSION_TOKEN = "googleToken"
+    // TODO: should this be stored in one cookie?
+    GOOGLE_SESSION_TOKEN = "googleToken",
+    GOOGLE_USER_NAME = "googleUserName",
+    GOOGLE_USER_EMAIL = "googleUserEmail",
 }
 
 export namespace CookieKey {

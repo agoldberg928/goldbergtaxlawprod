@@ -25,7 +25,7 @@ export const msalConfig = {
     },
     system: {
         loggerOptions: {
-            loggerCallback: (level, message, containsPii) => {
+            loggerCallback: (level: LogLevel, message: string, containsPii: boolean) => {
                 if (containsPii) {
                     return;
                 }
@@ -57,7 +57,7 @@ export const msalConfig = {
  * https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-permissions-and-consent#openid-connect-scopes
  */
 export const loginRequest = {
-    scopes: [process.env.REACT_APP_AZURE_APP_API_PERMISSION],
+    scopes: [process.env.REACT_APP_AZURE_APP_API_PERMISSION!],
 };
 
 /**

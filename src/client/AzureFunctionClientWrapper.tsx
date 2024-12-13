@@ -1,4 +1,4 @@
-import { AccountInfo, IPublicClientApplication } from "@azure/msal-browser"
+import { AccountInfo } from "@azure/msal-browser";
 import { IMsalContext, useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/authConfig";
 import { BlobContainerName } from "../model/enums"
@@ -8,12 +8,8 @@ export class AzureFunctionClientWrapper {
     private analyzeDocumentEndpoint: string
     private fetchSasTokenEndpoint: string
     private writeCsvSummaryEndpoint: string
-    private instance: IPublicClientApplication
-    private accounts: AccountInfo[]
     
-    constructor(clientEndpoint: string, msalContext: IMsalContext) {
-        this.instance = msalContext.instance
-        this.accounts = msalContext.accounts
+    constructor(clientEndpoint: string) {
         this.analyzeDocumentEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.ANALYZE_DOCUMENT_ENDPOINT_SUFFIX)
         this.fetchSasTokenEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.FETCH_SAS_TOKEN_ENDPOINT_SUFFIX)
         this.writeCsvSummaryEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.WRITE_CSV_SUMMARY_ENDPOINT_SUFFIX)
@@ -149,7 +145,8 @@ export class AzureFunctionClientWrapper {
 
     private async getValidAuthHeader(): Promise<HeadersInit> {
         // @ts-ignore
-        const authResponse = await this.instance.acquireTokenSilent({...loginRequest, account: this.accounts[0]})
+        const msal = useMsal()
+        const authResponse = await msal.instance.acquireTokenSilent({...loginRequest, account: msal.accounts[0]})
         return {
             Authorization: `Bearer ${authResponse.accessToken}`, // Attach the token
             'Content-Type': 'application/json'

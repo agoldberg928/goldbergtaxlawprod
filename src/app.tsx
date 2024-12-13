@@ -1,5 +1,6 @@
 import { IPublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider, AuthenticatedTemplate, useMsal, UnauthenticatedTemplate } from '@azure/msal-react';
+import { loginRequest } from './auth/authConfig';
 import { Button } from '@mui/material';
 import React from 'react';
 
@@ -18,7 +19,6 @@ export function AppMSalWrapper({instance, appComponent}: WrapperProps) {
 
 function App({appComponent}: any) {
   const msal = useMsal()
-  const activeAccount = msal.instance.getActiveAccount();
 
   const handleRedirect = () => {
       // @ts-ignore
@@ -28,7 +28,11 @@ function App({appComponent}: any) {
 
   return (
     <>
+        <AuthenticatedTemplate>
+            {appComponent}
+        </AuthenticatedTemplate>
         <UnauthenticatedTemplate>
+            {/* TODO: make this fancier */}
             <Button className="signInButton" onClick={handleRedirect} color='primary' variant="contained"> Sign in </Button>
         </UnauthenticatedTemplate>
     </>

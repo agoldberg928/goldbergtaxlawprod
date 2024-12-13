@@ -9,14 +9,11 @@ import { LoadingButton } from '@mui/lab';
 import { CloudUpload, OpenInNew, SendAndArchiveOutlined } from '@mui/icons-material';
 import { Box, Button, ButtonGroup } from '@mui/material';
 import { LinearProgressWithLabel, VisuallyHiddenInput } from './react_components/CustomMuiComponents';
-import { createGoogleSpreadSheet } from './auth/googlelogin';
-import { MsalProvider, AuthenticatedTemplate, useMsal, UnauthenticatedTemplate } from '@azure/msal-react';
 // import { AnalyzeDocumentsProgressModel } from './react_components/AnalyzeDocumentProgressModal';
-import { IPublicClientApplication } from '@azure/msal-browser';
-import { loginRequest } from './auth/authConfig';
 import { AnalyzeDocumentProgressBar, AnalyzeDocumentProgressInfo } from './react_components/AnalyzeDocumentProgressBar';
 import { ProcessingStatus } from './model/interfaces';
 import Dashboard from './dashboard/Dashboard';
+import { GOOGLE_API_WRAPPER } from './client/googleApiClient';
 
 export interface PdfView {
   file: File
@@ -31,20 +28,11 @@ export default function FileUploadApp() {
   const [spreadsheetId, setSpreadsheetId] = useState<string | undefined>(undefined)
   const [viewing, setViewing] = useState<PdfView | undefined>(undefined)
 
-  const msal = useMsal()
-  const activeAccount = msal.instance.getActiveAccount();
-
-  const functionWrapperRef = useRef(new AzureFunctionClientWrapper(process.env.REACT_APP_AZURE_FUNCTION_BASE_URL!, msal))
+  const functionWrapperRef = useRef(new AzureFunctionClientWrapper(process.env.REACT_APP_AZURE_FUNCTION_BASE_URL!))
   const AZURE_FUNCTION_WRAPPER = functionWrapperRef.current
 
   const storageWrapperRef = useRef(new AzureStorageClientWrapper(AZURE_FUNCTION_WRAPPER, process.env.REACT_APP_STORAGE_ACCOUNT!))
   const AZURE_STORAGE_WRAPPER = storageWrapperRef.current
-
-  const handleRedirect = () => {
-      // @ts-ignore
-      msal.instance.loginRedirect({...loginRequest, prompt: 'create',})
-          .catch((error) => console.log(error));
-  };
   
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.value == null) return
@@ -195,7 +183,7 @@ export default function FileUploadApp() {
 
     const csvSummaryFiles = await AZURE_FUNCTION_WRAPPER.writeCsv(statements)
     const csvFiles = await AZURE_STORAGE_WRAPPER.loadCsvFiles(csvSummaryFiles)
-    setSpreadsheetId(await createGoogleSpreadSheet(csvFiles))
+    setSpreadsheetId(await GOOGLE_API_WRAPPER.createGoogleSpreadSheet(csvFiles))
   }
 
 
@@ -211,104 +199,89 @@ export default function FileUploadApp() {
 
   return (
     <div>
-      <AuthenticatedTemplate>
-        <div>Welcome {activeAccount?.username} <Button onClick={() => msal.instance.logoutRedirect({account: activeAccount, postLogoutRedirectUri: process.env.REACT_APP_AZURE_FUNCTION_BASE_URL})}>Sign out</Button></div>
-        <div>
-          <h2>Analyze Documents</h2>
+      <div>
+        <h2>Analyze Documents</h2>
+        
+        <ButtonGroup variant='contained'>
+          {/* File Input + Label */}
+          <Button
+            color='secondary'
+            disabled={processingStatus !== undefined}
+            component="label"
+            role={undefined}
+            variant="contained"
+            tabIndex={-1}
+            startIcon={<CloudUpload />}
+          >
+            Select files
+            <VisuallyHiddenInput
+              type="file"
+              onChange={handleFileChange}
+              multiple
+            />
+          </Button>
+
+          <LoadingButton
+            size="large"
+            onClick={main}
+            endIcon={<SendAndArchiveOutlined />}
+            disabled={processingStatus !== undefined || selectedFiles.size == 0}
+            loading={processingStatus !== undefined}
+            loadingPosition="end"
+            variant="contained"
+          >
+            Analyze
+          </LoadingButton>
+          {/* Test Button */}
+          <input type="string" id='testInput'/>
+          <Button onClick={testButton}>
+            Test Button
+          </Button>
+        </ButtonGroup>
+
+        {/* Progress Bar */}
+        <Box>
           
-          <ButtonGroup variant='contained'>
-            {/* File Input + Label */}
-            <Button
-              color='secondary'
-              disabled={processingStatus !== undefined}
-              component="label"
-              role={undefined}
-              variant="contained"
-              tabIndex={-1}
-              startIcon={<CloudUpload />}
-            >
-              Select files
-              <VisuallyHiddenInput
-                type="file"
-                onChange={handleFileChange}
-                multiple
-              />
-            </Button>
-
-            <LoadingButton
-              size="large"
-              onClick={main}
-              endIcon={<SendAndArchiveOutlined />}
-              disabled={processingStatus !== undefined || selectedFiles.size == 0}
-              loading={processingStatus !== undefined}
-              loadingPosition="end"
-              variant="contained"
-            >
-              Analyze
-            </LoadingButton>
-            {/* Test Button */}
-            <input type="string" id='testInput'/>
-            <Button onClick={testButton}>
-              Test Button
-            </Button>
-          </ButtonGroup>
-
-          {/* Progress Bar */}
+          { processingStatus && 
+            <>
+              <h4>Current Run</h4>
+              <AnalyzeDocumentProgressBar {...processingStatus} />
+            </>
+          }
           <Box>
-            
-            { processingStatus && 
-              <>
-                <h4>Current Run</h4>
-                <AnalyzeDocumentProgressBar {...processingStatus} />
-              </>
-            }
-            <Box>
-              {spreadsheetId && 
-                <Button variant='contained' size='large' color='primary' endIcon={<OpenInNew />} 
-                  href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`} target='_blank'
-                >
-                  Open in Google Sheets
-                </Button>
-              }
-            </Box>
-          </Box>
-          {/* Previous Run */}
-          <Box>
-            
-            { previousStatuses.length > 0 && 
-              <>
-                <h4>Previous Run</h4>
-                <AnalyzeDocumentProgressInfo stage={previousStatuses[0].stage} statusMessage={previousStatuses[0].statusMessage} progress={previousStatuses[0].progress} />
-              </> 
+            {spreadsheetId && 
+              <Button variant='contained' size='large' color='primary' endIcon={<OpenInNew />} 
+                href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`} target='_blank'
+              >
+                Open in Google Sheets
+              </Button>
             }
           </Box>
-        </div>
-        <div>
-          {/* Selected Files Table */}
-          <h3>Selected Files</h3>
-          <FileStatusTable files={selectedFiles} handleRemoveClick={handleRemoveClick} handleViewClick={handleViewClick}/>
+        </Box>
+        {/* Previous Run */}
+        <Box>
+          
+          { previousStatuses.length > 0 && 
+            <>
+              <h4>Previous Run</h4>
+              <AnalyzeDocumentProgressInfo stage={previousStatuses[0].stage} statusMessage={previousStatuses[0].statusMessage} progress={previousStatuses[0].progress} />
+            </> 
+          }
+        </Box>
+      </div>
+      <div>
+        {/* Selected Files Table */}
+        <h3>Selected Files</h3>
+        <FileStatusTable files={selectedFiles} handleRemoveClick={handleRemoveClick} handleViewClick={handleViewClick}/>
 
-          {/* PDF Display iFrame */}
-          <div className='pdf-display-container'>
-            {
-              viewing && 
-              <iframe id="pdfDisplay" src={getObjectUrl(viewing)!}/>
-            }
-            
-          </div>
+        {/* PDF Display iFrame */}
+        <div className='pdf-display-container'>
+          {
+            viewing && 
+            <iframe id="pdfDisplay" src={getObjectUrl(viewing)!}/>
+          }
         </div>
-      </AuthenticatedTemplate>
-      <UnauthenticatedTemplate>
-          <Button className="signInButton" onClick={handleRedirect} color='primary' variant="contained"> Sign in </Button>
-      </UnauthenticatedTemplate>
+      </div>
     </div>
   );
 };
-
-export function FileUploadAppMSalWrapper({instance}: any) {
-  return (
-    <MsalProvider instance={instance}>
-      <FileUploadApp />
-    </MsalProvider>
-  )
-}

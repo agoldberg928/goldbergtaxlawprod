@@ -7,8 +7,7 @@ import "./css/sortabletable.css";
 
 require("./util/custom_typings/extensions")
 
-import FileUploadApp, { FileUploadAppMSalWrapper } from "./FileUploadApp";
-import { GoogleApiSignin } from './auth/googlelogin';
+import FileUploadApp from "./FileUploadApp";
 import { PublicClientApplication, EventType } from '@azure/msal-browser';
 import { msalConfig } from './auth/authConfig';
 
@@ -73,9 +72,6 @@ function RoutedApp() {
 
 root.render(
   <StrictMode>
-    <GoogleApiSignin />
     <RoutedApp />
-    {/* <GoogleApiSignin />
-    <FileUploadAppMSalWrapper instance={msalInstance} /> */}
   </StrictMode>
 );

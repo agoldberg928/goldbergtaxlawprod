@@ -101,10 +101,6 @@ export class AzureStorageClientWrapper {
         return (await blobBody)!.text()
         // return await (await (await (await this.getOutputClient()).getBlobClient(link).download()).blobBody!).text();
     }
-
-    async getMetadata(filename: string) {
-        const metadata = (await (await this.getOutputClient()).getBlobClient(filename).getProperties())
-    }
 }
 
 export interface CsvSummary {

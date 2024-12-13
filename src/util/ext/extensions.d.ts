@@ -22,6 +22,12 @@ declare global {
     interface FileList {
         forEach(mapperFunc: (file: File, idx: number) => void)
     }
+    declare namespace google.accounts.oauth2 {
+        interface TokenResponse {
+          id_token: string;
+        }
+      }
 }
+
 
 export {}
