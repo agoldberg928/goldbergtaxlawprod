@@ -26,7 +26,7 @@ export class AzureStorageClientWrapper {
     
     
     private async getOutputClient(): Promise<ContainerClient> {
-        if (getCookie(CookieKey.INPUT_SAS_TOKEN) && this.outputContainerClient) return this.outputContainerClient
+        if (getCookie(CookieKey.OUTPUT_SAS_TOKEN) && this.outputContainerClient) return this.outputContainerClient
         else return this.refreshOutputClient()
     }
 
@@ -48,6 +48,21 @@ export class AzureStorageClientWrapper {
     async uploadFile(file: File): Promise<BlobUploadCommonResponse> {
         const blobClient = (await this.getInputClient()).getBlockBlobClient(file.name);
         return blobClient.uploadData(file)
+    }
+
+    async downloadMetadataIfExists(filename: string): Promise<InputFileMetadata | undefined> {
+        try {
+            const blobClient = (await this.getInputClient()).getBlockBlobClient(filename);
+            const properties = await blobClient.getProperties()
+            return properties.metadata as any as InputFileMetadata
+        } catch(e: any) {
+            if (e.details?.errorCode === "BlobNotFound") {
+                return undefined
+            } else {
+                console.log(`ERROR calling metadata: ${e}`)
+                throw e
+            }
+        }
     }
 
     async loadExistingInputFiles(): Promise<BlobItem[]> {
@@ -86,6 +101,10 @@ export class AzureStorageClientWrapper {
         return (await blobBody)!.text()
         // return await (await (await (await this.getOutputClient()).getBlobClient(link).download()).blobBody!).text();
     }
+
+    async getMetadata(filename: string) {
+        const metadata = (await (await this.getOutputClient()).getBlobClient(filename).getProperties())
+    }
 }
 
 export interface CsvSummary {
@@ -93,4 +112,11 @@ export interface CsvSummary {
     accountSummary: string,
     statementSummary: string,
     records: string,
+}
+
+export interface InputFileMetadata {
+    split: string
+    analyzed: string
+    totalpages: string
+    statements: string
 }

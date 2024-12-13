@@ -1,4 +1,4 @@
-import { RunStatus, UploadStatus } from "../../model/enums"
+import { UploadStatus } from "../../model/enums"
 declare global {
     interface Map<K, V> {
         map<T>(mapperFunc: (key: K, value: V) => T): Array<T>
@@ -13,10 +13,10 @@ declare global {
 
     interface File {
         uploadStatus: UploadStatus
-        runStatus: RunStatus | undefined
         pagesAnalyzed: number | undefined
         totalPages: number | undefined
         statusMessage: string | undefined
+        statements: Array<string> | undefined
     }
 
     interface FileList {

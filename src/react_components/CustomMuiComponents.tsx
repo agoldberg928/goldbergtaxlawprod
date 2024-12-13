@@ -20,7 +20,7 @@ export function LinearProgressWithLabel(props: LinearProgressProps & { value: nu
             </Box>
         </>
     );
-  }
+}
 
 export const VisuallyHiddenInput = styled('input')({
     clip: 'rect(0 0 0 0)',

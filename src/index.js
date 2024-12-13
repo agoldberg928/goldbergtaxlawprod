@@ -7,22 +7,20 @@ import "./css/sortabletable.css";
 
 require("./util/custom_typings/extensions")
 
-import FileUploadApp, { MSalWrapper } from "./FileUploadApp";
-import { GoogleApiSignin } from './googlelogin';
+import FileUploadApp, { FileUploadAppMSalWrapper } from "./FileUploadApp";
+import { GoogleApiSignin } from './auth/googlelogin';
 import { PublicClientApplication, EventType } from '@azure/msal-browser';
 import { msalConfig } from './auth/authConfig';
 
 
-// import { BrowserRouter, Route } from 'react-router-dom';
-// function App() {
-//   return (
-//     <BrowserRouter>
-//       <Route exact path="/" component={Main} />
-//       <Route path="/about" component={Main} />
-//       <Route path="/contact" component={Main} />
-//     </BrowserRouter>
-//   );
-// }
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
+import Dashboard from './dashboard/Dashboard';
+import { AppMSalWrapper } from './app';
+
 // let app
 // switch (window.location.pathname) {
 //   case "/googlelogin": app = (<GoogleApiSignin />); break;
@@ -61,9 +59,23 @@ msalInstance.addEventCallback((event) => {
 
 
 const root = createRoot(document.getElementById("root"));
+
+function RoutedApp() {
+  return (
+      <BrowserRouter>
+          <Routes>
+              <Route index path="/" element={<AppMSalWrapper instance={msalInstance} appComponent={<FileUploadApp />} />} />
+              <Route path="/dashboard" element={<AppMSalWrapper instance={msalInstance} appComponent={<Dashboard />} />} />
+          </Routes>
+      </BrowserRouter>
+  );
+}
+
 root.render(
   <StrictMode>
     <GoogleApiSignin />
-    <MSalWrapper instance={msalInstance} />
+    <RoutedApp />
+    {/* <GoogleApiSignin />
+    <FileUploadAppMSalWrapper instance={msalInstance} /> */}
   </StrictMode>
 );

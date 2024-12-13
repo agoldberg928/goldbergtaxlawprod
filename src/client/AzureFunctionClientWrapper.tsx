@@ -44,7 +44,11 @@ export class AzureFunctionClientWrapper {
         }
     }
 
-    async analyzeDocuments(filenames: string[], pollerFunc: (status: AnalyzeDocumentIntermediateStatus) => void): Promise<string[]> {
+    async uploadFile() {
+        
+    }
+
+    async analyzeDocuments(filenames: string[], pollerFunc: (status: AnalyzeDocumentProgress) => void): Promise<AnalyzeDocumentResult> {
         const statusQueryURL = await this.initAnalyzeDocuments(filenames)
         return this.pollForStatus(statusQueryURL, pollerFunc)
     }
@@ -65,7 +69,7 @@ export class AzureFunctionClientWrapper {
         }
     }
 
-    private async pollForStatus(statusQueryURL: string, pollerFunc: (status: AnalyzeDocumentIntermediateStatus) => void) {
+    private async pollForStatus(statusQueryURL: string, pollerFunc: (status: AnalyzeDocumentProgress) => void) {
         let currentRunningStatus: RuntimeStatus
         let statusInfo: AnalyzeDocumentStatus
         do {
@@ -73,7 +77,12 @@ export class AzureFunctionClientWrapper {
             statusInfo = await this.getAnalyzeDocumentStatus(statusQueryURL)
             console.log(`current status: ${JSON.stringify(statusInfo)}`)
             currentRunningStatus = statusInfo.runtimeStatus
-            pollerFunc(statusInfo.customStatus)
+            pollerFunc({
+                requestId: statusInfo.instanceId,
+                status: statusInfo.customStatus,
+                createdTime: statusInfo.createdTime,
+                lastUpdatedTime: statusInfo.lastUpdatedTime
+            })
             if ((new Date(statusInfo.lastUpdatedTime).valueOf() + AzureFunctionClientWrapper.POLLING_TIMEOUT_PERIOD_MS) < new Date().valueOf()) {
                 throw Error(`[${statusQueryURL}] Function appears to be stuck as it has not updated in 5 minutes.  Please check the run ID for more details`)
             }
@@ -152,7 +161,7 @@ export class AzureFunctionClientWrapper {
     private static WRITE_CSV_SUMMARY_ENDPOINT_SUFFIX = "/api/WriteCsvSummary"
     
     private static SAS_TOKEN_EXPIRY_SECONDS = 60 * 15  // 15 minutes
-    private static POLLING_TIMEOUT_PERIOD_MS = 1000 * 60 * 2  // 2 minutes
+    private static POLLING_TIMEOUT_PERIOD_MS = 1000 * 60 * 5  // 5 minutes
 } 
 
 // TODO: verify these statuses
@@ -167,36 +176,41 @@ type AnalyzeDocumentStatus = {
     name: string
     instanceId: string
     runtimeStatus: RuntimeStatus
-    customStatus: AnalyzeDocumentIntermediateStatus
+    customStatus: AnalyzeDocumentCustomStatus
     // input: {}  ignore for now
     output: AnalyzeDocumentOutput
     createdTime: Date // might have to store as string
     lastUpdatedTime: Date
 }
 
-export type AnalyzeDocumentIntermediateStatus = {
+export type AnalyzeDocumentCustomStatus = {
     stage: string
     documents: Array<DocumentStatus>
     totalPages: number
     pagesCompleted: number
 }
 
-
-enum AnalyzeDocumentAction {
-    VERIFYING = "Verifying",
-    EXTRACTING_DATA = "Extracting Data"
+export type AnalyzeDocumentProgress = {
+    requestId: string
+    status: AnalyzeDocumentCustomStatus
+    createdTime: Date // might have to store as string
+    lastUpdatedTime: Date
 }
 
 export type DocumentStatus = {
-    documentName: string
+    fileName: string
     totalPages: number
     pagesCompleted: number
 }
 
 type AnalyzeDocumentOutput = {
     status: FinalStatus
-    result: string[]
+    result: AnalyzeDocumentResult
     errorMessage: string
+}
+
+export type AnalyzeDocumentResult = {
+    [key: string]: string[];
 }
 
 export enum FinalStatus {

@@ -1,7 +1,7 @@
 import { Login, Logout, Refresh } from "@mui/icons-material";
 import { Button } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { CookieKey, deleteCookie, getCookie, setCookie } from "./client/cookieClient";
+import { CookieKey, deleteCookie, getCookie, setCookie } from "../client/cookieClient";
 
 export function GoogleApiSignin() {
   useEffect(() => {
@@ -194,6 +194,8 @@ export async function createGoogleSpreadSheet(csvFiles) {
 
     const recordsSheetId = responseObj.sheets[0].properties.sheetId
 
+    // the create API can't create a sheet using csv data and it can't do things like set a whole row to bold, 
+    // you have to do it in batch updates
     const updateResponse = await gapi.client.sheets.spreadsheets.batchUpdate({
       spreadsheetId: spreadsheetId,
       resource: {

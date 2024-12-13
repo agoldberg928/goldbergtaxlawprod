@@ -46,4 +46,3 @@ FileList.prototype.forEach = function(func: (file: File, idx: number) => void) {
 // }
 
 File.prototype.uploadStatus = UploadStatus.PENDING
-File.prototype.runStatus = undefined

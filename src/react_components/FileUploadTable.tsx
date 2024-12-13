@@ -12,8 +12,9 @@ export function FileStatusTable({files, handleRemoveClick, handleViewClick}: Fil
             id: filename,
             file: file,
             uploadStatus: file.uploadStatus,
-            processStatus: `${file.runStatus ?? ""} ${file.totalPages ? file.pagesAnalyzed + "/" + file.totalPages : ""}`,
+            pagesProcessed: `${file.totalPages ? file.pagesAnalyzed ?? 0 + "/" + file.totalPages : ""}`,
             statusMessage: file.statusMessage,
+            statements: `${file.statements ?? ""}`,
             remove: filename
           }
     })
@@ -27,8 +28,9 @@ export function FileStatusTable({files, handleRemoveClick, handleViewClick}: Fil
             )
         } },
         { field: 'uploadStatus', headerName: 'Upload Status', width: 160 },
-        { field: 'processStatus', headerName: 'Process Status', width: 200 },
+        { field: 'pagesProcessed', headerName: 'Pages', width: 200 },
         { field: 'statusMessage', headerName: 'Status Message', width: 200 },
+        { field: 'statements', headerName: 'Statements', width: 200 },
         { field: 'remove', headerName: '', sortable: false, disableColumnMenu: true, display: 'flex', width: 50, resizable: false, renderCell: (params) => {
             return (
                 <IconButton aria-label="remove" onClick={() => handleRemoveClick(params.value)}><DeleteForeverOutlined color='error' /></IconButton>
