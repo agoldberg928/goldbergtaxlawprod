@@ -72,7 +72,7 @@ export default function SideMenu() {
         <Avatar
           sizes="small"
           alt={googleUser?.name ?? "Please Sign In"}
-          src="/images/google_logo.png"
+          src={`${process.env.REACT_APP_BASE_PATH}/images/google_logo.png`}
           sx={{ width: 36, height: 36 }}
         />
         <Box sx={{ mr: 'auto' }}>
@@ -107,7 +107,7 @@ export default function SideMenu() {
         <Avatar
           sizes="small"
           alt={azureActiveAccount!.name}
-          src="/images/azure_logo.png"
+          src={`${process.env.REACT_APP_BASE_PATH}/images/azure_logo.png`}
           sx={{ width: 36, height: 36 }}
         />
         <Box sx={{ mr: 'auto' }}>

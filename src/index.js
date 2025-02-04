@@ -40,7 +40,7 @@ const root = createRoot(document.getElementById("root"));
 
 function RoutedApp() {
   return (
-      <BrowserRouter>
+      <BrowserRouter basename={process.env.REACT_APP_BASE_PATH}>
           <Routes>
               <Route index path="/" element={<AppMSalWrapper instance={msalInstance} appComponent={<FileUploadApp />} />} />
               <Route path="/dashboard" element={<AppMSalWrapper instance={msalInstance} appComponent={<StatementsDashboard /> } />} />

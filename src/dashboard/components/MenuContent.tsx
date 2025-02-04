@@ -15,8 +15,8 @@ import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 import { Link } from 'react-router-dom';
 
 const mainListItems = [
-  { text: 'Files', icon: <HomeRoundedIcon />, path: "/" },
-  { text: 'Statements Dashboard', icon: <AnalyticsRoundedIcon />, path: "/dashboard"},
+  { text: 'Files', icon: <HomeRoundedIcon />, path: `${process.env.REACT_APP_BASE_PATH}/` },
+  { text: 'Statements Dashboard', icon: <AnalyticsRoundedIcon />, path: `${process.env.REACT_APP_BASE_PATH}/dashboard`},
   // { text: 'Clients', icon: <PeopleRoundedIcon /> },
   // { text: 'Tasks', icon: <AssignmentRoundedIcon /> },
 ];
