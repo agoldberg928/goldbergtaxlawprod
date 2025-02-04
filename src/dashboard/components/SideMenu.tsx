@@ -11,7 +11,7 @@ import MenuContent from './MenuContent';
 import CardAlert from './CardAlert';
 import OptionsMenu from './OptionsMenu';
 import { useMsal } from '@azure/msal-react';
-import { GoogleAccount, GOOGLE_API_WRAPPER } from '../../client/googleApiClient';
+import { GoogleAccount, GOOGLE_API_WRAPPER } from '../../client/GoogleApiClient';
 import { Button } from '@mui/material';
 import { Login, Google } from '@mui/icons-material';
 
@@ -57,7 +57,7 @@ export default function SideMenu() {
       </Box>
       <Divider />
       <MenuContent />
-      <CardAlert />
+      {/* <CardAlert /> */}
       {/* Displays Google Account */}
       <Stack
         direction="row"
@@ -86,7 +86,7 @@ export default function SideMenu() {
               </Typography>
             </>
             :
-            <Button variant="outlined" startIcon={<Google/>} endIcon={<Login /> } color="primary" id="refresh_button" onClick={() => GOOGLE_API_WRAPPER.signIn((signedInUser) =>  setGoogleUser(signedInUser) )}>
+            <Button variant="outlined" endIcon={<Login /> } color="warning" id="refresh_button" onClick={() => GOOGLE_API_WRAPPER.signIn((signedInUser) =>  setGoogleUser(signedInUser) )}>
                 Sign in
             </Button>
           }

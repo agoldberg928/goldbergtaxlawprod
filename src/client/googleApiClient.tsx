@@ -1,4 +1,4 @@
-import { CookieKey, deleteCookie, getCookie, setCookie } from "./cookieClient";
+import { deleteCookie, getCookie, setCookie, STATIC_COOKIE_KEYS } from "./CookieWrapper";
 import { CsvSummary } from "./AzureStorageClientWrapper";
 import { jwtDecode } from "jwt-decode";
 
@@ -64,12 +64,12 @@ class GoogleApiClient {
 
   private tryInit() {
     if (this.gapiInited && this.gisInited) {
-      const googleToken = getCookie(CookieKey.GOOGLE_SESSION_TOKEN)
+      const googleToken = getCookie(STATIC_COOKIE_KEYS.GOOGLE_SESSION_TOKEN)
       if (googleToken) {
         gapi.client.setToken({access_token: googleToken})
         this.signedInUser = {
-          name: getCookie(CookieKey.GOOGLE_USER_NAME)!,
-          email: getCookie(CookieKey.GOOGLE_USER_EMAIL)!
+          name: getCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_NAME)!,
+          email: getCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_EMAIL)!
         }
       } 
       const client = this
@@ -111,9 +111,9 @@ class GoogleApiClient {
 
     this.signedInUser = await this.fetchUserData(token)
 
-    setCookie(CookieKey.GOOGLE_SESSION_TOKEN, token, Number(resp.expires_in))
-    setCookie(CookieKey.GOOGLE_USER_EMAIL, this.signedInUser.email, Number(resp.expires_in))
-    setCookie(CookieKey.GOOGLE_USER_NAME, this.signedInUser.name, Number(resp.expires_in))
+    setCookie(STATIC_COOKIE_KEYS.GOOGLE_SESSION_TOKEN, token, Number(resp.expires_in))
+    setCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_EMAIL, this.signedInUser.email, Number(resp.expires_in))
+    setCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_NAME, this.signedInUser.name, Number(resp.expires_in))
     callback(this.signedInUser!)
   }
 
@@ -147,16 +147,16 @@ class GoogleApiClient {
     if (token !== null) {
       google.accounts.oauth2.revoke(token.access_token, (() => {
         gapi.client.setToken({access_token: ''});
-        deleteCookie(CookieKey.GOOGLE_SESSION_TOKEN)
-        deleteCookie(CookieKey.GOOGLE_USER_NAME)
-        deleteCookie(CookieKey.GOOGLE_USER_EMAIL)
+        deleteCookie(STATIC_COOKIE_KEYS.GOOGLE_SESSION_TOKEN)
+        deleteCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_NAME)
+        deleteCookie(STATIC_COOKIE_KEYS.GOOGLE_USER_EMAIL)
         this.signedInUser = undefined
       }).bind(this));
       callback()
     }
   }
 
-  async createGoogleSpreadSheet(csvFiles: CsvSummary) {
+  async createGoogleSpreadSheet(sheetTitle: string, csvFiles: CsvSummary) {
     if (!this.signedInUser) {
       throw Error("Please sign in to google in order to create a spreadsheet")
     }
@@ -168,7 +168,7 @@ class GoogleApiClient {
       const response = await gapi.client.sheets.spreadsheets.create({
         resource: {
           properties: {
-            title: "My Google Sheet"
+            title: sheetTitle
           },
           sheets: [
             {

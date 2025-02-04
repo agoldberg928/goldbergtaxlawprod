@@ -2,32 +2,76 @@ import { AccountInfo } from "@azure/msal-browser";
 import { IMsalContext, useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/authConfig";
 import { BlobContainerName } from "../model/enums"
-import { CookieKey, getCookie, setCookie } from "./cookieClient"
+import { CookieKey, DynamicCookieKey, getCookie, setCookie } from "./CookieWrapper"
+import { LOCAL_STORAGE_CLIENT } from "./LocalStorageClient";
 
 export class AzureFunctionClientWrapper {
     private analyzeDocumentEndpoint: string
     private fetchSasTokenEndpoint: string
     private writeCsvSummaryEndpoint: string
+    private listClientsEndpoint: string
+    private newClientEndpoint: string
+    private msal: IMsalContext
     
-    constructor(clientEndpoint: string) {
+    constructor(clientEndpoint: string, msal: IMsalContext) {
+        this.msal = msal
         this.analyzeDocumentEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.ANALYZE_DOCUMENT_ENDPOINT_SUFFIX)
         this.fetchSasTokenEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.FETCH_SAS_TOKEN_ENDPOINT_SUFFIX)
         this.writeCsvSummaryEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.WRITE_CSV_SUMMARY_ENDPOINT_SUFFIX)
+        this.listClientsEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.LIST_CLIENTS_ENDPOINT_SUFFIX)
+        this.newClientEndpoint = clientEndpoint.concat(AzureFunctionClientWrapper.NEW_CLIENT_ENDPOINT_SUFFIX)
     }
 
-    async retrieveSasToken(action: BlobContainerName): Promise<string> {
-        const cookieKey = CookieKey.forBlobContainer(action)
-        return getCookie(cookieKey) ?? await this.fetchNewSasToken(action, cookieKey)
+    async listClients(forceRefresh: Boolean): Promise<string[]> {
+        if (!forceRefresh) {
+            const storedData = LOCAL_STORAGE_CLIENT.getClients()
+            if (storedData) {
+                console.log(`Loaded clients from local storage`)
+                console.log(storedData)
+                return storedData
+            }
+        }
+        try {
+            const response = await this.fetchResponse(this.listClientsEndpoint, { method: "GET" });
+            LOCAL_STORAGE_CLIENT.storeClients(response.clients)
+            return response.clients
+        } catch (error: any) {
+            console.error("Error calling listClients:", error);
+            throw Error(`listClients failed: ${error}`)
+        }
     }
 
-    private async fetchNewSasToken(action: BlobContainerName, cookieKey: CookieKey): Promise<string> {
-        const searchParams = new URLSearchParams({ action: action })
+    async newClient(clientName: string): Promise<void> {
+        try {
+            const response = await this.fetchResponse(this.newClientEndpoint, { 
+                method: "POST",
+                body: JSON.stringify({
+                    clientName: clientName
+                })
+            });
+
+            console.log(response)
+        } catch (error: any) {
+            console.error("Error calling newClient:", error);
+            throw Error(`newClient failed with input [${clientName}]: ${error}`)
+        }
+    }
+
+    async retrieveSasToken(clientName: string, action: BlobContainerName): Promise<string> {
+        const cookieKey = BlobContainerName.forClient(clientName, action)
+        return getCookie(cookieKey) ?? await this.fetchNewSasToken(clientName, action, cookieKey)
+    }
+
+    private async fetchNewSasToken(clientName: string, action: BlobContainerName, cookieKey: DynamicCookieKey): Promise<string> {
+        const searchParams = new URLSearchParams({ clientName: clientName, action: action })
         
         try {
             const response = await this.fetchResponse(`${this.fetchSasTokenEndpoint}?${searchParams}`, { 
                 method: "GET"
             });
             const token = response.token;
+            
+            console.log(`fetched new ${cookieKey} token: ${token}`)
     
             setCookie(cookieKey, token, AzureFunctionClientWrapper.SAS_TOKEN_EXPIRY_SECONDS);
     
@@ -44,16 +88,17 @@ export class AzureFunctionClientWrapper {
         
     }
 
-    async analyzeDocuments(filenames: string[], pollerFunc: (status: AnalyzeDocumentProgress) => void): Promise<AnalyzeDocumentResult> {
-        const statusQueryURL = await this.initAnalyzeDocuments(filenames)
+    async analyzeDocuments(clientName: string, filenames: string[], pollerFunc: (status: AnalyzeDocumentProgress) => void): Promise<AnalyzeDocumentResult> {
+        const statusQueryURL = await this.initAnalyzeDocuments(clientName, filenames)
         return this.pollForStatus(statusQueryURL, pollerFunc)
     }
 
-    private async initAnalyzeDocuments(filenames: string[]): Promise<string> {
+    private async initAnalyzeDocuments(clientName: string, filenames: string[]): Promise<string> {
         try {
             const response = await this.fetchResponse(this.analyzeDocumentEndpoint, { 
                 method: "POST",
                 body: JSON.stringify({
+                    clientName: clientName,
                     documents: filenames,
                     overwrite: true
                 })
@@ -76,8 +121,8 @@ export class AzureFunctionClientWrapper {
             pollerFunc({
                 requestId: statusInfo.instanceId,
                 status: statusInfo.customStatus,
-                createdTime: statusInfo.createdTime,
-                lastUpdatedTime: statusInfo.lastUpdatedTime
+                createdTime: new Date(statusInfo.createdTime),
+                lastUpdatedTime: new Date(statusInfo.lastUpdatedTime)
             })
             if ((new Date(statusInfo.lastUpdatedTime).valueOf() + AzureFunctionClientWrapper.POLLING_TIMEOUT_PERIOD_MS) < new Date().valueOf()) {
                 throw Error(`[${statusQueryURL}] Function appears to be stuck as it has not updated in 5 minutes.  Please check the run ID for more details`)
@@ -95,19 +140,19 @@ export class AzureFunctionClientWrapper {
 
     private async getAnalyzeDocumentStatus(statusQueryUrl: string): Promise<AnalyzeDocumentStatus> {
         try {
-            const response = await this.fetchResponse(statusQueryUrl, { method: "GET" });
-            return response
+            return await this.fetchResponse(statusQueryUrl, { method: "GET" });
         } catch(err: any) {
             // TODO: what to do if this fails? Should probably implement limited retry to persist through network failures, etc.
             throw Error(`[${statusQueryUrl}] Call to get status of analyze documents process failed: ${err}`)
         }
     }
 
-    async writeCsv(statements: string[]): Promise<WriteCsvSummaryResult> {
+    async writeCsv(clientName: string, statements: string[]): Promise<WriteCsvSummaryResult> {
         try {
             const response = await this.fetchResponse(this.writeCsvSummaryEndpoint, { 
                 method: "POST",
                 body: JSON.stringify({
+                    clientName: clientName,
                     statementKeys: statements,
                     outputDirectory: "reacttest",
                 })
@@ -145,8 +190,7 @@ export class AzureFunctionClientWrapper {
 
     private async getValidAuthHeader(): Promise<HeadersInit> {
         // @ts-ignore
-        const msal = useMsal()
-        const authResponse = await msal.instance.acquireTokenSilent({...loginRequest, account: msal.accounts[0]})
+        const authResponse = await this.msal.instance.acquireTokenSilent({...loginRequest, account: this.msal.accounts[0]})
         return {
             Authorization: `Bearer ${authResponse.accessToken}`, // Attach the token
             'Content-Type': 'application/json'
@@ -156,6 +200,8 @@ export class AzureFunctionClientWrapper {
     private static ANALYZE_DOCUMENT_ENDPOINT_SUFFIX = "/api/InitAnalyzeDocuments"
     private static FETCH_SAS_TOKEN_ENDPOINT_SUFFIX = "/api/RequestSASToken"
     private static WRITE_CSV_SUMMARY_ENDPOINT_SUFFIX = "/api/WriteCsvSummary"
+    private static LIST_CLIENTS_ENDPOINT_SUFFIX = "/api/ListClients"
+    private static NEW_CLIENT_ENDPOINT_SUFFIX = "/api/NewClient"
     
     private static SAS_TOKEN_EXPIRY_SECONDS = 60 * 15  // 15 minutes
     private static POLLING_TIMEOUT_PERIOD_MS = 1000 * 60 * 5  // 5 minutes
@@ -176,8 +222,8 @@ type AnalyzeDocumentStatus = {
     customStatus: AnalyzeDocumentCustomStatus
     // input: {}  ignore for now
     output: AnalyzeDocumentOutput
-    createdTime: Date // might have to store as string
-    lastUpdatedTime: Date
+    createdTime: string // might have to store as string
+    lastUpdatedTime: string
 }
 
 export type AnalyzeDocumentCustomStatus = {

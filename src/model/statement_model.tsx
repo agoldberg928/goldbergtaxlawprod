@@ -1,4 +1,26 @@
-export interface BankStatement {
+export interface BankStatementInfo {
+    stmtFilename: string
+    account: string
+    bankName: string
+    date: string
+    totalSpending: number
+    totalIncomeCredits: number
+    numTransactions: number
+    bankType: string
+    verifiedInfo: {
+        suspicious: boolean
+        missingChecks: boolean
+        manuallyVerified: boolean
+    }
+    inputFileInfo: {
+        name: string
+        startPage: number
+        endPage: number
+    }
+    details?: BankStatementDetails
+}
+
+export interface BankStatementDetails {
     filename: string,
     classification: string,
     date: string,

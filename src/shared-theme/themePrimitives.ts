@@ -249,7 +249,7 @@ export const colorSchemes = {
       },
       info: {
         light: brand[100],
-        main: brand[300],
+        main: brand[400],
         dark: brand[600],
         contrastText: gray[50],
       },

@@ -22,7 +22,7 @@ export default function Header() {
       }}
       spacing={2}
     >
-      <NavbarBreadcrumbs />
+      {/* <NavbarBreadcrumbs /> */}
       <Stack direction="row" sx={{ gap: 1 }}>
         <Search />
         <CustomDatePicker />

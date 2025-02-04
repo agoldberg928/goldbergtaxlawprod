@@ -3,6 +3,7 @@ import { MsalProvider, AuthenticatedTemplate, useMsal, UnauthenticatedTemplate }
 import { loginRequest } from './auth/authConfig';
 import { Button } from '@mui/material';
 import React from 'react';
+import Dashboard from './Dashboard';
 
 interface WrapperProps {
     instance: IPublicClientApplication,
@@ -29,7 +30,7 @@ function App({appComponent}: any) {
   return (
     <>
         <AuthenticatedTemplate>
-            {appComponent}
+          <Dashboard appComponent={appComponent}/>
         </AuthenticatedTemplate>
         <UnauthenticatedTemplate>
             {/* TODO: make this fancier */}
