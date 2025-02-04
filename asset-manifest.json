@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/static/css/main.338d075f.css",
-    "main.js": "/static/js/main.b7f3cbcc.js",
-    "index.html": "/index.html",
-    "main.338d075f.css.map": "/static/css/main.338d075f.css.map",
-    "main.b7f3cbcc.js.map": "/static/js/main.b7f3cbcc.js.map"
+    "main.css": "/goldbergtaxlawprod/static/css/main.338d075f.css",
+    "main.js": "/goldbergtaxlawprod/static/js/main.b169b0f1.js",
+    "index.html": "/goldbergtaxlawprod/index.html",
+    "main.338d075f.css.map": "/goldbergtaxlawprod/static/css/main.338d075f.css.map",
+    "main.b169b0f1.js.map": "/goldbergtaxlawprod/static/js/main.b169b0f1.js.map"
   },
   "entrypoints": [
     "static/css/main.338d075f.css",
-    "static/js/main.b7f3cbcc.js"
+    "static/js/main.b169b0f1.js"
   ]
 }
