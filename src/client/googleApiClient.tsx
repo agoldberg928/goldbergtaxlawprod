@@ -1,6 +1,5 @@
 import { deleteCookie, getCookie, setCookie, STATIC_COOKIE_KEYS } from "./CookieWrapper";
 import { CsvSummary } from "./AzureStorageClientWrapper";
-import { jwtDecode } from "jwt-decode";
 
 export interface GoogleAccount {
   name: string,

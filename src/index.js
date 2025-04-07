@@ -1,19 +1,22 @@
-import 'react-app-polyfill/stable';
 import React, { StrictMode } from "react";
+import 'react-app-polyfill/stable';
 import { createRoot } from "react-dom/client";
-import "./css/styles.css";
+import "./css/loading.css";
 import "./css/sortabletable.css";
+import "./css/styles.css";
 
 require("./util/custom_typings/extensions")
 
-import FileUploadApp from "./file_upload/FileUploadApp";
-import { PublicClientApplication, EventType } from '@azure/msal-browser';
+import { EventType, PublicClientApplication } from '@azure/msal-browser';
 import { msalConfig } from './auth/authConfig';
+import FileUploadApp from "./pages/file_upload/FileUploadApp";
 
 
-import { BrowserRouter, Routes, Route, } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppMSalWrapper } from './app';
-import StatementsDashboard from './statements/StatementsDashboard';
+import StatementsDashboard from './pages/statements/StatementsDashboard';
+import { StatementDetails } from "./pages/statementDetails/StatementDetails";
+import ApiHelperApp from "./pages/api_helper/ApiHelperApp";
 
 /**
  * MSAL should be instantiated outside of the component tree to prevent it from being re-instantiated on re-renders.
@@ -42,15 +45,21 @@ function RoutedApp() {
   return (
       <BrowserRouter basename={process.env.REACT_APP_BASE_PATH}>
           <Routes>
-              <Route index path="/" element={<AppMSalWrapper instance={msalInstance} appComponent={<FileUploadApp />} />} />
-              <Route path="/dashboard" element={<AppMSalWrapper instance={msalInstance} appComponent={<StatementsDashboard /> } />} />
+              <Route index path="/" element={<FileUploadApp />} />
+              <Route path="/dashboard" element={<StatementsDashboard /> } />
+              <Route path="/statement" element={<StatementDetails stmtId={new URL(window.location).searchParams.get("stmtId") || "invalid"} /> } />
+              <Route path="/api" element={<ApiHelperApp /> } />
           </Routes>
       </BrowserRouter>
   );
 }
 
+document.title = `${window.location.pathname.replace("/", "").capitalize()} - ${document.title}`
+
 root.render(
   <StrictMode>
-    <RoutedApp />
+    <AppMSalWrapper instance={msalInstance}>
+        <RoutedApp />
+    </AppMSalWrapper>
   </StrictMode>
 );

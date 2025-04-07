@@ -1,11 +1,15 @@
-import { BlobUploadCommonResponse, ContainerClient } from "@azure/storage-blob";
-import { AzureFunctionClientWrapper, WriteCsvSummaryResult } from "./AzureFunctionClientWrapper";
-import { CookieKey, getCookie } from "./CookieWrapper";
-import { BlobContainerName } from "../model/enums";
-import { BankStatementDetails, BankStatementInfo } from "../model/statement_model";
+import { BlobUploadCommonResponse, ContainerClient, Metadata } from "@azure/storage-blob";
+import { AzureFunctionClientWrapper, AZURE_FUNCTION_WRAPPER, ForceRefresh, RequiresMSAL } from "./AzureFunctionClientWrapper";
+import { getCookie } from "./CookieWrapper";
+import { BlobContainerName } from "../model/blobContainerName";
+import { BankStatementDetails, BankStatementInfo } from "../model/statementModel";
 import { transformStatementsField } from "../util/util";
-import { LOCAL_STORAGE_CLIENT } from "./LocalStorageClient";
-import { UploadStatus } from "../model/documentAnalysis";
+import { UploadStatus } from "../model/analyzeDocumentApiModel";
+import { IMsalContext } from "@azure/msal-react";
+import { WriteCsvSummaryOutput } from "../model/analyzeDocumentApiModel";
+import { FUNCTION_NAME_KEY, logResult } from "../util/decorators/LogResultDecorator";
+import { ApiError } from "../model/error/CustomFacingError";
+import { UploadedFile } from "../data/uploadedFilesSlice";
 
 
 export class AzureStorageClientWrapper {
@@ -18,45 +22,54 @@ export class AzureStorageClientWrapper {
         this.azureFunctionWrapper = functionWrapper
     }
 
-    async getContainerClient(clientName: string, container: BlobContainerName): Promise<ContainerClient> {
+    async getContainerClient(clientName: string, container: BlobContainerName, msal: IMsalContext): Promise<ContainerClient> {
         const clientContainerName = BlobContainerName.forClient(clientName, container)
         if (getCookie(clientContainerName) && this.containerClients.has(container)) {
             return this.containerClients.get(container)!
         } else {
-            const sasToken = await this.azureFunctionWrapper.retrieveSasToken(clientName, container)
+            const sasToken = await this.azureFunctionWrapper.retrieveSasToken(clientName, container, msal)
             const client = new ContainerClient(`https://${this.storageAccountName}.blob.core.windows.net/${clientContainerName}?${sasToken}`)
             this.containerClients.set(clientContainerName, client)
             return client
         }
     }
 
-    async uploadFile(clientName: string, file: File): Promise<BlobUploadCommonResponse> {
-        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT)).getBlockBlobClient(file.name);
-        return blobClient.uploadData(file)
+    async getInputBlobUrl(clientName: string, filename: string, msal: IMsalContext): Promise<string> {
+        const clientContainerName = BlobContainerName.forClient(clientName, BlobContainerName.INPUT)
+        const sasToken = getCookie(clientContainerName) || await this.azureFunctionWrapper.retrieveSasToken(clientName, BlobContainerName.INPUT, msal)
+        return `https://${this.storageAccountName}.blob.core.windows.net/${clientContainerName}/${filename}?${sasToken}`
     }
 
-    async downloadInputFile(clientName: string, filename: string): Promise<File> {
-        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT)).getBlockBlobClient(filename);
-        const resp = await blobClient.download()
-        const blob = await resp.blobBody
+    async uploadFile(clientName: string, file: File, msal: IMsalContext): Promise<BlobUploadCommonResponse> {
+        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT, msal)).getBlockBlobClient(file.name);
+        return blobClient.uploadData(file, { blobHTTPHeaders: { blobContentType: "application/pdf" } });
+    }
 
-        if (!blob) throw Error (`Unable to download blob from ${filename}, returned empty`)
+    async deleteStatement(clientName: string, filename: string, msal: IMsalContext) {
+        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.STATEMENTS, msal)).getBlockBlobClient(filename);
+        blobClient.delete()
+    }
+
+    @logStorageClientResult()
+    async downloadInputFile(clientName: string, filename: string, msal: IMsalContext): Promise<File> {
+        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT, msal)).getBlockBlobClient(filename);
+        const resp = await blobClient.download();
+        const blob = await resp.blobBody;
+
+        if (!blob) throw new ApiError(`Unable to download blob from ${filename}, returned empty`)
         
-        // TODO: convert to File? Or use another object
-        const file = new File([blob], filename, {
+        return new File([blob], filename, {
             type: "application/pdf",
-            lastModified: resp.lastModified?.getUTCMilliseconds(), // Set last modified date to current time
+            lastModified: resp.lastModified?.getUTCMilliseconds()
         });
-        console.log(file)
-        return file
     }
 
-    async downloadMetadataIfExists(clientName: string, filename: string): Promise<InputFileMetadata | undefined> {
+    async downloadMetadataIfExists(clientName: string, filename: string, msal: IMsalContext): Promise<InputFileMetadata | undefined> {
         try {
-            const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT)).getBlockBlobClient(filename);
-            const properties = await blobClient.getProperties()
-            return properties.metadata as any as InputFileMetadata
-        } catch(e: any) {
+            const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT, msal)).getBlockBlobClient(filename);
+            const properties = await blobClient.getProperties();
+            return properties.metadata as any as InputFileMetadata;
+        } catch (e: any) {
             if (e.details?.errorCode === "BlobNotFound") {
                 return undefined
             } else {
@@ -66,21 +79,21 @@ export class AzureStorageClientWrapper {
         }
     }
 
-    async loadUploadedFilesList(clientName: string, forceRefresh: Boolean = false): Promise<UploadedFile[]> {
-        if (!forceRefresh) {
-            const storedData = LOCAL_STORAGE_CLIENT.getUploadedFiles(clientName)
-            if (storedData) {
-                console.log(`Loaded uploaded files from local storage`)
-                console.log(storedData)
-                return storedData
-            }
-        }
+    async updateInputMetadata(clientName: string, filename: string, metadata: InputFileMetadata, msal: IMsalContext) {
+        const blobClient = (await this.getContainerClient(clientName, BlobContainerName.INPUT, msal)).getBlockBlobClient(filename);
+        blobClient.setMetadata(metadata as any as Metadata)
+    }
+
+    @logStorageClientResult()
+    async loadUploadedFilesList(clientName: string, msal: IMsalContext): Promise<UploadedFile[]> {
         const files: UploadedFile[] = []
         
-        for await (const blob of (await this.getContainerClient(clientName, BlobContainerName.INPUT)).listBlobsFlat({includeTags: true, includeMetadata: true})) {
-            const metadata = (blob.metadata || undefined) as InputFileMetadata | undefined
+        for await (const blob of (await this.getContainerClient(clientName, BlobContainerName.INPUT, msal)).listBlobsFlat({includeTags: true, includeMetadata: true})) {
+            const metadata = (blob.metadata || undefined) as InputFileMetadata | undefined;
             files.push({
+                id: blob.name,
                 name: blob.name,
+                // fileObjectUrl: `https://${this.storageAccountName}.blob.core.windows.net/${BlobContainerName.INPUT}/${blob.name}`, // Updated to use fileObjectUrl
                 uploadStatus: UploadStatus.SUCCESS,
                 pagesAnalyzed: metadata?.analyzed ? Number(metadata?.totalpages) : 0,
                 totalPages: Number(metadata?.totalpages),
@@ -88,30 +101,18 @@ export class AzureStorageClientWrapper {
             })
         }
 
-        console.log(`Loaded uploaded files list from server`)
-        console.log(files)
-
-        LOCAL_STORAGE_CLIENT.storeUploadedFiles(clientName, files)
-
         return files
     }
 
-    async loadStatementsList(clientName: string, forceRefresh: Boolean = false): Promise<BankStatementInfo[]> {
-        if (!forceRefresh) {
-            const storedData = LOCAL_STORAGE_CLIENT.getStatements(clientName)
-            if (storedData) {
-                console.log(`Loaded statements list from local storage`)
-                console.log(storedData)
-                return storedData
-            }
-        }
-
+    @logStorageClientResult()
+    async loadStatementsList(clientName: string, msal: IMsalContext): Promise<BankStatementInfo[]> {
         const statementInfos: BankStatementInfo[] = []
-        for await (const blob of (await this.getContainerClient(clientName, BlobContainerName.STATEMENTS)).listBlobsFlat({includeTags: true, includeMetadata: true})) {
+        for await (const blob of (await this.getContainerClient(clientName, BlobContainerName.STATEMENTS, msal)).listBlobsFlat({includeTags: true, includeMetadata: true})) {
             // format is 9652:CITI CC:9_7_2023.json
             const [account, bank, date] = transformStatementsField(blob.name).split(":")
             const metadata = blob.metadata! as any as BankStatementFileMetadata
             statementInfos.push({
+                id: blob.name,
                 stmtFilename: blob.name,
                 account: account,
                 bankName: bank,
@@ -133,35 +134,21 @@ export class AzureStorageClientWrapper {
             })
         }
 
-        console.log(`Loaded statements list from server`)
-        console.log(statementInfos)
-
-        LOCAL_STORAGE_CLIENT.storeStatements(clientName, statementInfos)
-
         return statementInfos
     }
 
-    async loadStatementDetails(clientName: string, info: BankStatementInfo, forceRefresh: Boolean = false): Promise<BankStatementDetails> {
-        if (!forceRefresh) {
-            const storedData = LOCAL_STORAGE_CLIENT.getStatementDetails(clientName, info.stmtFilename)
-            if (storedData) {
-                console.log(`Loaded statement details from local storage for ${info.stmtFilename}`)
-                console.log(storedData)
-                return storedData
-            }
-        }
-        const response = await (await (await this.getContainerClient(clientName, BlobContainerName.STATEMENTS)).getBlobClient(info.stmtFilename).download()).blobBody;
-        const details = JSON.parse(await response!.text()) as BankStatementDetails
-
-        LOCAL_STORAGE_CLIENT.storeStatementDetails(clientName, info.stmtFilename, details)
-        return details
+    @logStorageClientResult({ useArgs: { "filename": 1 } })
+    async loadStatementDetails(clientName: string, stmtFilename: string, msal: IMsalContext, forceRefresh: Boolean = false): Promise<BankStatementDetails> {
+        const response = await (await (await this.getContainerClient(clientName, BlobContainerName.STATEMENTS, msal)).getBlobClient(stmtFilename).download()).blobBody;
+        const res = JSON.parse(await response!.text()) as BankStatementDetails
+        return {...res, id: res.filename} as BankStatementDetails
     }
 
-    async loadCsvFiles(clientName: string, links: WriteCsvSummaryResult): Promise<CsvSummary> {
-        const checkSummaryPromise = this.loadCsvFile(clientName, links.checkSummaryFile)
-        const accountSummaryPromise = this.loadCsvFile(clientName, links.accountSummaryFile)
-        const statementSummaryPromise = this.loadCsvFile(clientName, links.statementSummaryFile)
-        const recordsPromise = this.loadCsvFile(clientName, links.recordsFile)
+    async loadCsvFiles(clientName: string, links: WriteCsvSummaryOutput, msal: IMsalContext): Promise<CsvSummary> {
+        const checkSummaryPromise = this.loadCsvFile(clientName, links.checkSummaryFile, msal)
+        const accountSummaryPromise = this.loadCsvFile(clientName, links.accountSummaryFile, msal)
+        const statementSummaryPromise = this.loadCsvFile(clientName, links.statementSummaryFile, msal)
+        const recordsPromise = this.loadCsvFile(clientName, links.recordsFile, msal)
         return {
             checkSummary: await checkSummaryPromise,
             accountSummary: await accountSummaryPromise,
@@ -170,13 +157,48 @@ export class AzureStorageClientWrapper {
         }
     }
     
-    async loadCsvFile(clientName: string, link: string) {
-        const blobResponse = (await (await this.getContainerClient(clientName, BlobContainerName.OUTPUT)).getBlobClient(link).download())
-        const blobBody = blobResponse.blobBody
-        return (await blobBody)!.text()
-        // return await (await (await (await this.getOutputClient()).getBlobClient(link).download()).blobBody!).text();
+    async loadCsvFile(clientName: string, link: string, msal: IMsalContext): Promise<string> {
+        const blobResponse = (await (await this.getContainerClient(clientName, BlobContainerName.OUTPUT, msal)).getBlobClient(link).download())
+        const blobBody = await blobResponse.blobBody
+        if (!blobBody) throw new ApiError(`Unable to load csv ${link}: the response is`)
+        return blobBody.text()
     }
 }
+
+export const AZURE_STORAGE_WRAPPER = new AzureStorageClientWrapper(AZURE_FUNCTION_WRAPPER, process.env.REACT_APP_STORAGE_ACCOUNT!);
+
+export interface LoadUploadedFilesProps extends RequiresMSAL, ForceRefresh {}
+
+export interface LoadStatementsListProps extends RequiresMSAL, ForceRefresh {}
+
+export interface DownladAllMetadataProps extends RequiresMSAL {}
+
+export interface DownladMetadataProps extends RequiresMSAL {
+    filename: string
+}
+
+export interface DeleteStatementProps extends RequiresMSAL {
+    filename: string
+}
+
+export interface UpdateMetadataProps extends RequiresMSAL {
+    filename: string,
+    metadata: InputFileMetadata
+}
+
+export interface DownloadFileProps extends RequiresMSAL {
+    filename: string
+}
+
+export interface DownloadStatementDetailsProps extends RequiresMSAL, ForceRefresh {
+    filename: string
+}
+
+export interface UploadFileProps extends RequiresMSAL {
+    file: UploadedFile
+}
+
+export interface UploadFilesProps extends RequiresMSAL {}
 
 export interface CsvSummary {
     checkSummary: string,
@@ -202,4 +224,12 @@ export interface BankStatementFileMetadata {
     suspicious: string
     missingChecks: string
     manuallyVerified: string
+}
+
+function logStorageClientResult(options?: {useArgs?: Record<string, number>}) {
+    return logResult({message: `Loaded ${FUNCTION_NAME_KEY} from server`, functionNameTransform: transformFunctionName, useArgs: options?.useArgs})
+}
+
+function transformFunctionName(functionName: string) {
+    return functionName.replace(/^load/, "").addSpacesBeforeCapitalLetters().trim().toLowerCase();
 }

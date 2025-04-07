@@ -1,4 +1,4 @@
-import { UploadStatus } from "../../model/enums"
+import { UploadStatus } from "../../model/blobContainerName"
 declare global {
     interface Map<K, V> {
         map<T>(mapperFunc: (key: K, value: V, idx: number) => T): Array<T>
@@ -9,26 +9,12 @@ declare global {
     }
 
     interface Array<T> {
-        toMap<K, V>(): Map<K, V>
-        uniq(): Array<T>
-    }
-
-    interface UploadedFile {
-        name: string,
-        file?: File,
-        uploadStatus: UploadStatus
-        pagesAnalyzed?: number | undefined
-        totalPages?: number | undefined
-        statusMessage?: string | undefined
-        statements?: Array<string> | undefined
-        selected?: boolean
-    }
-
-    export interface InputFileMetadata {
-        split: string
-        analyzed: string
-        totalpages: string
-        statements: string
+        // toMap<K, V>(): Map<K, V>
+        // uniq(): Array<T>
+        remove(idx: number): Array<T>
+        removeItem(item: T): Array<T>
+        mapNotNull<R>(mapperFunc: (item: T, idx: number) => R | null | undefined): Array<R>
+        last(): T
     }
 
     interface FileList {
@@ -42,6 +28,13 @@ declare global {
 
     interface Number {
         asCurrency(): string
+        round(): number
+    }
+
+    interface String {
+        capitalize(): string
+        asCurrency(): string
+        addSpacesBeforeCapitalLetters(): string
     }
 }
 

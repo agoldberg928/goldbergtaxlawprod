@@ -1,4 +1,4 @@
-import { ContainerClientName } from "../model/enums";
+import { ContainerClientName } from "../model/blobContainerName";
 
 
 export function setCookie(cname: CookieKey, cvalue: string, seconds?: number) {
